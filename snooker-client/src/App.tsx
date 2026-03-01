@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
 import './App.css';
@@ -12,11 +12,12 @@ interface PlayerStat {
   losses: number;
   matches: number;
   amountOwed: number;
+  totalPaid?: number;
 }
 
 function Home() {
-  const [player1, setPlayer1] = useState('Player 1');
-  const [player2, setPlayer2] = useState('Player 2');
+  const [player1, setPlayer1] = useState('');
+  const [player2, setPlayer2] = useState('');
   const [matchType, setMatchType] = useState('FRAME_UNIQUE');
   const [stats, setStats] = useState<Record<string, PlayerStat>>({});
   const [showStats, setShowStats] = useState(false);
@@ -57,6 +58,27 @@ function Home() {
     checkAdminStatus();
   }, []);
 
+  const location = useLocation();
+
+  // Fullscreen toggle for TV & Remote view
+  useEffect(() => {
+    const isTv = location.pathname.includes('/tv/');
+    const isRemote = location.pathname.includes('/remote/');
+    if (isTv || isRemote) {
+      document.body.classList.add('full-screen-app');
+    } else {
+      document.body.classList.remove('full-screen-app');
+    }
+  }, [location]);
+
+  // Lobby Automation: Sync names from table state
+  useEffect(() => {
+    if (tableState?.players && tableState.players.length >= 2) {
+      setPlayer1(tableState.players[0] || '');
+      setPlayer2(tableState.players[1] || '');
+    }
+  }, [tableState?.players]);
+
   const clearStats = async () => {
     try {
       const res = await fetch(`${API_URL}/api/stats`, {
@@ -70,12 +92,26 @@ function Home() {
   };
 
   const joinAsRemote = () => {
-    const params = new URLSearchParams({ p1: player1, p2: player2, type: matchType, reset: 'true' });
+    // Only pass players if there is no active match to prevent resetting scores
+    const isMatchActive = tableState && !tableState.isWaitingForMatch && !tableState.isMatchOver;
+    const params = new URLSearchParams();
+    if (!isMatchActive) {
+      params.set('p1', player1);
+      params.set('p2', player2);
+      params.set('type', matchType);
+      params.set('reset', 'true');
+    }
     navigate(`/remote/TABLE1?${params.toString()}`);
   };
 
   const joinAsTv = () => {
-    const params = new URLSearchParams({ p1: player1, p2: player2, type: matchType });
+    const isMatchActive = tableState && !tableState.isWaitingForMatch && !tableState.isMatchOver;
+    const params = new URLSearchParams();
+    if (!isMatchActive) {
+      params.set('p1', player1);
+      params.set('p2', player2);
+      params.set('type', matchType);
+    }
     navigate(`/tv/TABLE1?${params.toString()}`);
   };
 
@@ -194,6 +230,8 @@ function Home() {
 
   const statEntries = Object.entries(stats);
   const totalOwed = statEntries.reduce((sum, [, s]) => sum + s.amountOwed, 0);
+  const totalMatchesPlayed = Math.floor(statEntries.reduce((sum, [, s]) => sum + s.matches, 0) / 2);
+  const calculatedTotalEarnings = totalMatchesPlayed * 20;
 
   return (
     <div className="app-container" style={{ padding: '1.5rem', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
@@ -211,9 +249,11 @@ function Home() {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>PLAYER 2</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: tableState?.queue?.length ? '#2ecc71' : 'var(--color-text-muted)', fontWeight: tableState?.queue?.length ? 'bold' : 'normal' }}>
+              {tableState?.queue?.length ? '👤 JOUEUR SUIVANT' : 'PLAYER 2'}
+            </label>
             <input type="text" value={player2} onChange={e => setPlayer2(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 'var(--radius-sm)' }}
+              style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', border: tableState?.queue?.length ? '1px solid #2ecc71' : '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 'var(--radius-sm)' }}
             />
           </div>
         </div>
@@ -232,7 +272,7 @@ function Home() {
         <div className="flex-col" style={{ gap: '1rem' }}>
           <button onClick={joinAsRemote}
             style={{ padding: '1rem', background: 'var(--color-accent-green)', color: 'black', fontWeight: 'bold', fontSize: '1.1rem', borderRadius: 'var(--radius-full)' }}>
-            📱 Launch Mobile Remote
+            {tableState && !tableState.isWaitingForMatch && !tableState.isMatchOver ? '📱 Resume Active Match' : '📱 Launch Mobile Remote'}
           </button>
 
           <button onClick={joinAsTv}
@@ -283,12 +323,41 @@ function Home() {
 
       <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', margin: 0 }}>📊 Statistiques</h2>
+          <h2 style={{ fontSize: '1.5rem', margin: 0 }}>📊 Statistiques <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>({statEntries.length} joueurs)</span></h2>
           <button onClick={() => { setShowStats(!showStats); if (!showStats) fetchStats(); }}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
             {showStats ? 'Masquer' : 'Afficher'}
           </button>
         </div>
+
+        {showStats && isAdmin && statEntries.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ background: 'rgba(46, 204, 113, 0.1)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(46, 204, 113, 0.2)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#2ecc71', opacity: 0.8, textTransform: 'uppercase' }}>Revenus Totaux</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2ecc71' }}>
+                {calculatedTotalEarnings} DH
+              </div>
+            </div>
+            <div style={{ background: 'rgba(241, 196, 15, 0.1)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(241, 196, 15, 0.2)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#f1c40f', opacity: 0.8, textTransform: 'uppercase' }}>À Encaisser</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f1c40f' }}>{totalOwed} DH</div>
+            </div>
+            <div style={{ background: 'rgba(52, 152, 219, 0.1)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(52, 152, 219, 0.2)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#3498db', opacity: 0.8, textTransform: 'uppercase' }}>Matchs Joués</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3498db' }}>
+                {Math.floor(statEntries.reduce((sum, [, s]) => sum + s.matches, 0) / 2)}
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div style={{ fontSize: '0.75rem', opacity: 0.5, textTransform: 'uppercase' }}>Paiements</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                <span style={{ color: '#2ecc71' }}>{statEntries.filter(([, s]) => s.losses > 0 && s.amountOwed === 0).length} PAID</span>
+                <span style={{ margin: '0 0.5rem', opacity: 0.3 }}>|</span>
+                <span style={{ color: '#e74c3c' }}>{statEntries.filter(([, s]) => s.amountOwed > 0).length} Dus</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showStats && (
           <>
@@ -302,19 +371,30 @@ function Home() {
                       <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>Joueur</th>
                       <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: '#2ecc71' }}>V</th>
                       <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: '#e74c3c' }}>D</th>
-                      <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>Total</th>
+                      <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>Status</th>
                       <th style={{ textAlign: 'right', padding: '0.75rem 0.5rem', color: '#f1c40f' }}>Tarif</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(statEntries as [string, PlayerStat][]).map(([name, s]) => (
                       <tr key={name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>{name}</td>
+                        <td style={{ padding: '0.75rem 0.5rem' }}>
+                          <div style={{ fontWeight: 'bold' }}>{name}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{s.matches} match{s.matches > 1 ? 's' : ''}</div>
+                        </td>
                         <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: '#2ecc71', fontWeight: 'bold' }}>{s.wins}</td>
                         <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: '#e74c3c', fontWeight: 'bold' }}>{s.losses}</td>
-                        <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem' }}>{s.matches}</td>
+                        <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem' }}>
+                          {s.losses > 0 ? (
+                            s.amountOwed === 0 ? (
+                              <span style={{ background: '#2ecc71', color: 'black', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>PAID</span>
+                            ) : (
+                              <span style={{ background: '#e74c3c', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>DUE</span>
+                            )
+                          ) : null}
+                        </td>
                         <td style={{ textAlign: 'right', padding: '0.75rem 0.5rem', color: s.amountOwed > 0 ? '#f1c40f' : '#2ecc71', fontWeight: 'bold' }}>
-                          {s.amountOwed > 0 ? `${s.amountOwed} DH` : '0 DH'}
+                          <div style={{ fontSize: s.amountOwed > 0 ? '1rem' : '0.85rem' }}>{s.amountOwed > 0 ? `${s.amountOwed} DH` : `✓ ${s.totalPaid || 0} DH`}</div>
                           {isAdmin && s.amountOwed > 0 && (
                             <button onClick={() => markPaid(name)}
                               style={{ display: 'block', marginTop: '0.25rem', width: '100%', padding: '0.25rem', background: '#2ecc71', border: 'none', color: 'black', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>

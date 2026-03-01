@@ -19,6 +19,8 @@ export interface GameState {
     isWaitingForMatch?: boolean;
     matchStartTime?: number;
     queue?: string[];
+    isMatchOver?: boolean;
+    matchWinner?: string | null;
 }
 
 const SERVER_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';

@@ -30,8 +30,8 @@ async function recordMatchResult(winner, loser, matchType) {
             const winnerDoc = await t.get(winnerRef);
             const loserDoc = await t.get(loserRef);
 
-            const wData = winnerDoc.exists ? winnerDoc.data() : { wins: 0, losses: 0, matches: 0, amountOwed: 0 };
-            const lData = loserDoc.exists ? loserDoc.data() : { wins: 0, losses: 0, matches: 0, amountOwed: 0 };
+            const wData = winnerDoc.exists ? winnerDoc.data() : { wins: 0, losses: 0, matches: 0, amountOwed: 0, totalPaid: 0 };
+            const lData = loserDoc.exists ? loserDoc.data() : { wins: 0, losses: 0, matches: 0, amountOwed: 0, totalPaid: 0 };
 
             wData.wins++;
             wData.matches++;
@@ -53,7 +53,14 @@ async function markPlayerPaid(playerName) {
     if (!db || !playerName) return false;
     try {
         const playerRef = db.collection('stats').doc(playerName);
-        await playerRef.update({ amountOwed: 0 });
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(playerRef);
+            if (!doc.exists) return;
+            const data = doc.data();
+            const owed = data.amountOwed || 0;
+            const totalPaid = (data.totalPaid || 0) + owed;
+            t.update(playerRef, { amountOwed: 0, totalPaid: totalPaid });
+        });
         return true;
     } catch (err) {
         console.error('Error marking player paid:', err);

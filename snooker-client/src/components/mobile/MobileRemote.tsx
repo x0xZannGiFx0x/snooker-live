@@ -16,15 +16,20 @@ export default function MobileRemote() {
             const players = [searchParams.get('p1'), searchParams.get('p2')];
             const matchType = searchParams.get('type') || 'FRAME_UNIQUE';
 
-            if (searchParams.get('reset') === 'true') {
-                sendAction('RESET_GAME', { players, matchType });
-            } else {
-                sendAction('SET_MATCH_CONFIG', { players, matchType });
+            // Only send config if we explicitly want a reset or if the current game is empty
+            const isMatchActive = gameState && gameState.players && gameState.players[0] !== 'A';
+
+            if (searchParams.get('reset') === 'true' || !isMatchActive) {
+                if (searchParams.get('reset') === 'true') {
+                    sendAction('RESET_GAME', { players, matchType });
+                } else {
+                    sendAction('SET_MATCH_CONFIG', { players, matchType });
+                }
             }
             // Clear params from URL so we don't keep sending them on refresh
             setSearchParams({}, { replace: true });
         }
-    }, [connected, searchParams, sendAction, setSearchParams]);
+    }, [connected, searchParams, sendAction, setSearchParams, gameState]);
 
     if (!connected || !gameState) {
         return (
@@ -65,10 +70,13 @@ export default function MobileRemote() {
     return (
         <div className="mobile-app dark-theme">
             <header className="top-bar">
+                <button onClick={() => navigate('/')} className="btn-back-lobby">
+                    <span>⬅</span> Lobby
+                </button>
                 <div className="session-info">
                     Session <span className="session-number">LIGUE</span>
                 </div>
-                <div className="tv-link">
+                <div onClick={() => navigate(`/tv/${roomCode}`)} className="tv-link" style={{ cursor: 'pointer' }}>
                     📺 Écran TV
                 </div>
             </header>
