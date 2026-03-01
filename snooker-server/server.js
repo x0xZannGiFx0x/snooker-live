@@ -67,6 +67,45 @@ app.post('/api/admin/stats/pay', verifyAdminToken, async (req, res) => {
     }
 });
 
+app.post('/api/queue', (req, res) => {
+    const { roomCode, playerName } = req.body;
+    if (!roomCode || !playerName) return res.status(400).json({ error: 'roomCode and playerName required' });
+    let room = getRoom(roomCode);
+    if (!room) {
+        room = createRoom(roomCode);
+        room.gameState = createGame();
+    }
+    if (!room.gameState.queue) room.gameState.queue = [];
+    room.gameState.queue.push(playerName);
+    persistGameState(roomCode, room.gameState);
+
+    // Attempt to broadcast if io exists (it will be hoisted naturally, but we can do it via a global getter or just let the client refresh if it's on TvView. Since io is declared below... wait, we will move this logic below or just shift io up.)
+    // For now we'll just handle it.
+    if (global.io) global.io.to(roomCode).emit('game_state_update', room.gameState);
+
+    res.json({ success: true, queue: room.gameState.queue });
+});
+
+app.post('/api/admin/daily-archive', verifyAdminToken, async (req, res) => {
+    try {
+        const stats = await getPlayerStats();
+        if (Object.keys(stats).length === 0) return res.json({ success: true, message: 'No stats to archive' });
+
+        const { db } = require('./src/firebaseConfig');
+        const reportDate = new Date().toISOString().split('T')[0];
+
+        await db.collection('daily_reports').doc(reportDate).set({
+            timestamp: Date.now(),
+            statsSnapshot: stats
+        });
+
+        await clearAllStats();
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to archive stats' });
+    }
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -74,6 +113,7 @@ const io = new Server(server, {
         methods: ['GET', 'POST']
     }
 });
+global.io = io; // Expose securely for the REST API queue push
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -108,6 +148,17 @@ io.on('connection', (socket) => {
                     if (winnerName && loserName) {
                         recordMatchResult(winnerName.trim(), loserName.trim(), room.gameState.matchType);
                         console.log(`[STATS] Match recorded: ${winnerName} beat ${loserName}`);
+
+                        // Winner Stays On Logic
+                        if (room.gameState.queue && room.gameState.queue.length > 0) {
+                            const nextPlayer = room.gameState.queue.shift(); // Pull next player
+                            const newMatchPlayers = [winnerName, nextPlayer];
+                            // Re-init game for the new match
+                            const newGame = require('./src/gameMachine').createGame(newMatchPlayers, room.gameState.matchType);
+                            newGame.queue = room.gameState.queue; // keep queue
+                            room.gameState = newGame;
+                            console.log(`[QUEUE] Starting new match: ${winnerName} vs ${nextPlayer}`);
+                        }
                     }
                 }
 

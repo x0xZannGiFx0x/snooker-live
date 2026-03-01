@@ -13,13 +13,14 @@ export default function MobileRemote() {
     // Send configuration if we just joined from home with params
     useEffect(() => {
         if (connected && searchParams.has('p1') && searchParams.has('p2')) {
+            const players = [searchParams.get('p1'), searchParams.get('p2')];
+            const matchType = searchParams.get('type') || 'FRAME_UNIQUE';
+
             if (searchParams.get('reset') === 'true') {
-                sendAction('RESET_GAME');
+                sendAction('RESET_GAME', { players, matchType });
+            } else {
+                sendAction('SET_MATCH_CONFIG', { players, matchType });
             }
-            sendAction('SET_MATCH_CONFIG', {
-                players: [searchParams.get('p1'), searchParams.get('p2')],
-                matchType: searchParams.get('type') || 'FRAME_UNIQUE'
-            });
             // Clear params from URL so we don't keep sending them on refresh
             window.history.replaceState({}, document.title, window.location.pathname);
         }

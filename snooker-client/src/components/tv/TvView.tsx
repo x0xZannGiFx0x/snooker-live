@@ -20,16 +20,14 @@ export default function TvView() {
         }
     }, [connected, searchParams, sendAction]);
 
-    // Timer state
-    const [elapsed, setElapsed] = useState(0);
+    // Timer state decoupled from gameState re-renders
+    const [currentTime, setCurrentTime] = useState(Date.now());
     useEffect(() => {
-        if (!gameState || !gameState.matchStartTime) return;
-        const startTime = gameState.matchStartTime;
-        const interval = setInterval(() => {
-            setElapsed(Date.now() - startTime);
-        }, 1000);
+        const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
         return () => clearInterval(interval);
-    }, [gameState]);
+    }, []);
+
+    const elapsed = gameState?.matchStartTime && !gameState.isWaitingForMatch ? currentTime - gameState.matchStartTime : 0;
 
     if (!connected || !gameState) {
         return (
@@ -83,10 +81,27 @@ export default function TvView() {
 
             </div>
 
-            {/* Timer Overlay */}
-            {gameState.matchStartTime && (
-                <div className="timer-overlay" style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(0,0,0,0.5)', color: 'white', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', fontFamily: 'monospace' }}>
+            {/* Enhanced Independent Timer Overlay */}
+            {gameState.matchStartTime && !gameState.isWaitingForMatch && (
+                <div className="timer-overlay" style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', color: '#f1c40f', padding: '1rem 2.5rem', borderRadius: '12px', fontFamily: 'monospace', fontSize: '3rem', fontWeight: 'bold', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 10 }}>
                     {minutes}:{seconds}
+                </div>
+            )}
+
+            {/* Display Player Queue seamlessly */}
+            {gameState.queue && gameState.queue.length > 0 && (
+                <div style={{ position: 'absolute', bottom: '100px', right: '2rem', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', padding: '1.5rem', borderRadius: '12px', zIndex: 5, textAlign: 'left' }}>
+                    <h3 style={{ margin: '0 0 1rem 0', color: '#2ecc71', fontSize: '1.5rem', textTransform: 'uppercase', letterSpacing: '2px' }}>A Venir (File d'attente)</h3>
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                        {gameState.queue.map((player: string, index: number) => (
+                            <li key={index} style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ background: '#e74c3c', color: 'white', fontWeight: 'bold', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>
+                                    {index + 1}
+                                </span>
+                                {player}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
             {/* Current Break Overlay perfectly centered over everything */}

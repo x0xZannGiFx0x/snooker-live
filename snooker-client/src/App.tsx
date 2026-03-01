@@ -21,6 +21,7 @@ function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [nextPlayerName, setNextPlayerName] = useState('');
 
   const navigate = useNavigate();
 
@@ -122,6 +123,43 @@ function Home() {
     }
   };
 
+  const archiveDailyReports = async () => {
+    if (!confirm('Voulez-vous vraiment archiver la journée ? Cela remettra toutes les statistiques (victoires, défaites) et fermera la session du jour !')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/daily-archive`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert('Journée archivée avec succès !');
+        fetchStats();
+      } else {
+        alert('Erreur lors de l\'archivage.');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addNextPlayerContext = async () => {
+    if (!nextPlayerName.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode: 'TABLE1', playerName: nextPlayerName })
+      });
+      if (res.ok) {
+        alert(`${nextPlayerName} a été ajouté à la file d'attente !`);
+        setNextPlayerName('');
+      } else {
+        alert('Erreur lors de l\'ajout du joueur.');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const statEntries = Object.entries(stats);
   const totalOwed = statEntries.reduce((sum, [, s]) => sum + s.amountOwed, 0);
 
@@ -173,6 +211,21 @@ function Home() {
       </div>
 
       {/* Stats Section */}
+      <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '100%', marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#3498db' }}>👤 Ajouter le Joueur Suivant</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input
+            className="player-input"
+            value={nextPlayerName}
+            onChange={e => setNextPlayerName(e.target.value)}
+            placeholder="Nom du prochain joueur"
+          />
+          <button className="btn-launch" style={{ padding: '0.75rem' }} onClick={addNextPlayerContext}>
+            ➕ Ajouter à la File
+          </button>
+        </div>
+      </div>
+
       <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', margin: 0 }}>📊 Statistiques</h2>
@@ -238,7 +291,12 @@ function Home() {
             {/* Admin Login Toggle */}
             <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
               {isAdmin ? (
-                <button onClick={logoutAdmin} style={{ width: '100%', padding: '0.5rem', background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-sm)' }}>Déconnexion Admin</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button onClick={archiveDailyReports} style={{ width: '100%', padding: '0.75rem', background: '#e67e22', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 'bold' }}>
+                    🌅 Archiver la Journée (New Day)
+                  </button>
+                  <button onClick={logoutAdmin} style={{ width: '100%', padding: '0.5rem', background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-sm)' }}>Déconnexion Admin</button>
+                </div>
               ) : (
                 <>
                   {!showAdminLogin ? (

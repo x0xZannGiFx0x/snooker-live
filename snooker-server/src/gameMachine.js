@@ -34,7 +34,8 @@ function createGame(players = ['Player 1', 'Player 2'], matchType = 'FRAME_UNIQU
         lastFrameWinner: null,
         isWaitingForMatch: true,
         matchStartTime: null,
-        history: []
+        history: [],
+        queue: []
     };
 }
 
@@ -176,9 +177,12 @@ function handleAction(prevState, action, payload) {
             break;
 
         case 'RESET_GAME':
-            const newGame = createGame(state.players, state.matchType);
+            const p = payload && payload.players ? payload.players : state.players;
+            const m = payload && payload.matchType ? payload.matchType : state.matchType;
+            const newGame = createGame(p, m);
             newGame.isWaitingForMatch = true;
             newGame.matchStartTime = Date.now();
+            newGame.queue = [...(state.queue || [])]; // Preserve queue on reset
             newGame.history = [{ ...newGame }];
             return newGame;
     }
