@@ -24,8 +24,9 @@ export default function TvView() {
     const [elapsed, setElapsed] = useState(0);
     useEffect(() => {
         if (!gameState || !gameState.matchStartTime) return;
+        const startTime = gameState.matchStartTime;
         const interval = setInterval(() => {
-            setElapsed(Date.now() - gameState.matchStartTime);
+            setElapsed(Date.now() - startTime);
         }, 1000);
         return () => clearInterval(interval);
     }, [gameState]);

@@ -11,6 +11,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from the React app dist folder
+app.use(express.static(path.join(__dirname, '../snooker-client/dist')));
+
 // REST API for stats
 app.get('/api/stats', (req, res) => {
     res.json(getPlayerStats());
@@ -78,6 +81,13 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../snooker-client/dist', 'index.html'));
+});
+
 server.listen(PORT, () => {
     console.log(`Socket.io server listening on *:${PORT}`);
 });
