@@ -1,27 +1,70 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { createRoom, getRoom, joinRoom, leaveRoom } = require('./src/roomManager');
+const { createRoom, getRoom, joinRoom, leaveRoom, initRooms, persistGameState } = require('./src/roomManager');
 const { createGame, handleAction } = require('./src/gameMachine');
-const { getPlayerStats, recordMatchResult, clearAllStats } = require('./src/statsManager');
-const path = require('path');
+const { getPlayerStats, recordMatchResult, clearAllStats, markPlayerPaid } = require('./src/statsManager');
+const cookieParser = require('cookie-parser');
+const { generateAdminToken, verifyAdminToken, ADMIN_PASSWORD } = require('./src/adminAuth');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 // Serve static files from the React app dist folder
 app.use(express.static(path.join(__dirname, '../snooker-client/dist')));
 
 // REST API for stats
-app.get('/api/stats', (req, res) => {
-    res.json(getPlayerStats());
+app.get('/api/stats', async (req, res) => {
+    const stats = await getPlayerStats();
+    res.json(stats);
 });
 
-app.delete('/api/stats', (req, res) => {
-    clearAllStats();
+app.delete('/api/stats', verifyAdminToken, async (req, res) => {
+    await clearAllStats();
     res.json({ success: true });
+});
+
+// Admin Auth Endpoints
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        const token = generateAdminToken();
+        res.cookie('admin_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Invalid password' });
+    }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+    res.clearCookie('admin_token');
+    res.json({ success: true });
+});
+
+app.get('/api/admin/check', verifyAdminToken, (req, res) => {
+    res.json({ success: true, loggedIn: true });
+});
+
+app.post('/api/admin/stats/pay', verifyAdminToken, async (req, res) => {
+    const { playerName } = req.body;
+    if (!playerName) return res.status(400).json({ error: 'Player name required' });
+
+    const success = await markPlayerPaid(playerName);
+    if (success) {
+        res.json({ success: true });
+    } else {
+        res.status(500).json({ error: 'Failed to mark player paid' });
+    }
 });
 
 const server = http.createServer(app);
@@ -41,6 +84,7 @@ io.on('connection', (socket) => {
         if (!room) {
             room = createRoom(roomCode);
             room.gameState = createGame();
+            persistGameState(roomCode, room.gameState);
         }
         joinRoom(roomCode, socket.id);
 
@@ -67,6 +111,7 @@ io.on('connection', (socket) => {
                     }
                 }
 
+                persistGameState(roomCode, room.gameState);
                 io.to(roomCode).emit('game_state_update', room.gameState);
             } catch (err) {
                 console.error(`[ERROR] processing action ${action}:`, err);
@@ -88,6 +133,11 @@ app.use((req, res) => {
     res.sendFile(path.join(__dirname, '../snooker-client/dist', 'index.html'));
 });
 
-server.listen(PORT, () => {
-    console.log(`Socket.io server listening on *:${PORT}`);
-});
+async function startServer() {
+    await initRooms();
+    server.listen(PORT, () => {
+        console.log(`Socket.io server listening on *:${PORT}`);
+    });
+}
+
+startServer();

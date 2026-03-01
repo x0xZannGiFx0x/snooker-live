@@ -18,11 +18,26 @@ function Home() {
   const [matchType, setMatchType] = useState('FRAME_UNIQUE');
   const [stats, setStats] = useState<Record<string, PlayerStat>>({});
   const [showStats, setShowStats] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   const navigate = useNavigate();
 
+  const API_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
+
+  const checkAdminStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/check`, { credentials: 'include' });
+      if (res.ok) {
+        setIsAdmin(true);
+      }
+    } catch (e) {
+      console.error('Failed to check admin status', e);
+    }
+  };
+
   const fetchStats = async () => {
-    const API_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
     try {
       const res = await fetch(`${API_URL}/api/stats`);
       const data = await res.json();
@@ -34,13 +49,16 @@ function Home() {
 
   useEffect(() => {
     fetchStats();
+    checkAdminStatus();
   }, []);
 
   const clearStats = async () => {
-    const API_URL = import.meta.env.PROD ? '' : 'http://localhost:3001';
     try {
-      await fetch(`${API_URL}/api/stats`, { method: 'DELETE' });
-      setStats({});
+      const res = await fetch(`${API_URL}/api/stats`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (res.ok) setStats({});
     } catch (e) {
       console.error('Failed to clear stats', e);
     }
@@ -54,6 +72,54 @@ function Home() {
   const joinAsTv = () => {
     const params = new URLSearchParams({ p1: player1, p2: player2, type: matchType });
     navigate(`/tv/TABLE1?${params.toString()}`);
+  };
+
+  const loginAdmin = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        setIsAdmin(true);
+        setShowAdminLogin(false);
+        setAdminPassword('');
+      } else {
+        alert('Mot de passe incorrect');
+      }
+    } catch (e) {
+      console.error('Failed to log in', e);
+    }
+  };
+
+  const logoutAdmin = async () => {
+    try {
+      await fetch(`${API_URL}/api/admin/logout`, { method: 'POST', credentials: 'include' });
+      setIsAdmin(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const markPaid = async (playerName: string) => {
+    if (!confirm(`Confirmer que ${playerName} a payé ?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/stats/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        fetchStats();
+      } else {
+        alert('Erreur: impossible de marquer payé');
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const statEntries = Object.entries(stats);
@@ -141,6 +207,12 @@ function Home() {
                         <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem' }}>{s.matches}</td>
                         <td style={{ textAlign: 'right', padding: '0.75rem 0.5rem', color: s.amountOwed > 0 ? '#f1c40f' : '#2ecc71', fontWeight: 'bold' }}>
                           {s.amountOwed > 0 ? `${s.amountOwed} DH` : '0 DH'}
+                          {isAdmin && s.amountOwed > 0 && (
+                            <button onClick={() => markPaid(name)}
+                              style={{ display: 'block', marginTop: '0.25rem', width: '100%', padding: '0.25rem', background: '#2ecc71', border: 'none', color: 'black', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                              ✓ Marquer Payé
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -156,12 +228,37 @@ function Home() {
               </div>
             )}
 
-            {statEntries.length > 0 && (
+            {statEntries.length > 0 && isAdmin && (
               <button onClick={clearStats}
                 style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', background: 'rgba(231, 76, 60, 0.1)', border: '1px solid rgba(231, 76, 60, 0.3)', color: '#e74c3c', borderRadius: 'var(--radius-sm)', fontWeight: 'bold' }}>
                 🗑️ Effacer toutes les statistiques
               </button>
             )}
+
+            {/* Admin Login Toggle */}
+            <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+              {isAdmin ? (
+                <button onClick={logoutAdmin} style={{ width: '100%', padding: '0.5rem', background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-sm)' }}>Déconnexion Admin</button>
+              ) : (
+                <>
+                  {!showAdminLogin ? (
+                    <button onClick={() => setShowAdminLogin(true)} style={{ width: '100%', padding: '0.5rem', background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-sm)' }}>Mode Admin (Gestion des paiements)</button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="password"
+                        placeholder="Mot de passe"
+                        value={adminPassword}
+                        onChange={e => setAdminPassword(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && loginAdmin()}
+                        style={{ flex: 1, padding: '0.5rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 'var(--radius-sm)' }}
+                      />
+                      <button onClick={loginAdmin} style={{ padding: '0.5rem 1rem', background: 'var(--color-accent-green)', color: 'black', fontWeight: 'bold', borderRadius: 'var(--radius-sm)', border: 'none' }}>Login</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
