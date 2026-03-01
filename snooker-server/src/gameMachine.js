@@ -40,7 +40,8 @@ function createGame(players = ['Player 1', 'Player 2'], matchType = 'FRAME_UNIQU
 }
 
 function cloneState(state) {
-    return JSON.parse(JSON.stringify(state));
+    const { history, ...rest } = state;
+    return JSON.parse(JSON.stringify(rest));
 }
 
 function switchPlayer(state) {
@@ -56,13 +57,14 @@ function handleAction(prevState, action, payload) {
     // Save to history before modifying
     if (action !== 'UNDO') {
         if (!prevState.history) prevState.history = [];
-        // Keep last 50 states to prevent huge memory
-        if (prevState.history.length > 50) prevState.history.shift();
-        const historyEntry = { ...cloneState(prevState), history: [] };
+        // Keep last 15 states to prevent memory bloat
+        if (prevState.history.length > 15) prevState.history.shift();
+        const historyEntry = cloneState(prevState);
         prevState.history.push(historyEntry);
     }
 
     const state = cloneState(prevState);
+    state.history = prevState.history; // Maintain reference to history array
 
     switch (action) {
         case 'POT_RED':

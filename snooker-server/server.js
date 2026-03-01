@@ -86,6 +86,30 @@ app.post('/api/queue', (req, res) => {
     res.json({ success: true, queue: room.gameState.queue });
 });
 
+app.post('/api/queue/remove', (req, res) => {
+    const { roomCode, index } = req.body;
+    const room = getRoom(roomCode);
+    if (room && room.gameState.queue) {
+        room.gameState.queue.splice(index, 1);
+        persistGameState(roomCode, room.gameState);
+        if (global.io) global.io.to(roomCode).emit('game_state_update', room.gameState);
+        return res.json({ success: true, queue: room.gameState.queue });
+    }
+    res.status(404).json({ error: 'Room or queue not found' });
+});
+
+app.post('/api/queue/edit', (req, res) => {
+    const { roomCode, index, newName } = req.body;
+    const room = getRoom(roomCode);
+    if (room && room.gameState.queue && room.gameState.queue[index] !== undefined) {
+        room.gameState.queue[index] = newName;
+        persistGameState(roomCode, room.gameState);
+        if (global.io) global.io.to(roomCode).emit('game_state_update', room.gameState);
+        return res.json({ success: true, queue: room.gameState.queue });
+    }
+    res.status(404).json({ error: 'Room or player not found' });
+});
+
 app.post('/api/admin/daily-archive', verifyAdminToken, async (req, res) => {
     try {
         const stats = await getPlayerStats();

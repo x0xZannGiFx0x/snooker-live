@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 // Define the shape of our game state
@@ -52,11 +52,11 @@ export function useSocket(roomCode: string) {
         };
     }, [roomCode]);
 
-    const sendAction = (action: string, payload: any = {}) => {
+    const sendAction = useCallback((action: string, payload: any = {}) => {
         if (socket && connected) {
             socket.emit('game_action', { roomCode, action, payload });
         }
-    };
+    }, [socket, connected, roomCode]);
 
     return { gameState, connected, sendAction };
 }

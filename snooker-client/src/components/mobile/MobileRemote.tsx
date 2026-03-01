@@ -5,7 +5,7 @@ import './MobileRemote.css';
 
 export default function MobileRemote() {
     const { roomCode } = useParams<{ roomCode: string }>();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { gameState, connected, sendAction } = useSocket(roomCode || '');
     const navigate = useNavigate();
     const [showFoulModal, setShowFoulModal] = useState(false);
@@ -22,9 +22,9 @@ export default function MobileRemote() {
                 sendAction('SET_MATCH_CONFIG', { players, matchType });
             }
             // Clear params from URL so we don't keep sending them on refresh
-            window.history.replaceState({}, document.title, window.location.pathname);
+            setSearchParams({}, { replace: true });
         }
-    }, [connected]);
+    }, [connected, searchParams, sendAction, setSearchParams]);
 
     if (!connected || !gameState) {
         return (

@@ -1,5 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useSocket } from './hooks/useSocket';
+import './App.css';
 
 // Placeholders for views
 import TvView from './components/tv/TvView';
@@ -22,6 +24,8 @@ function Home() {
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [nextPlayerName, setNextPlayerName] = useState('');
+
+  const { gameState: tableState } = useSocket('TABLE1');
 
   const navigate = useNavigate();
 
@@ -134,7 +138,7 @@ function Home() {
         alert('Journée archivée avec succès !');
         fetchStats();
       } else {
-        alert('Erreur lors de l\'archivage.');
+        alert('Erreur lors de l’archivage.');
       }
     } catch (e) {
       console.error(e);
@@ -150,11 +154,39 @@ function Home() {
         body: JSON.stringify({ roomCode: 'TABLE1', playerName: nextPlayerName })
       });
       if (res.ok) {
-        alert(`${nextPlayerName} a été ajouté à la file d'attente !`);
         setNextPlayerName('');
       } else {
-        alert('Erreur lors de l\'ajout du joueur.');
+        alert('Erreur lors de l’ajout du joueur.');
       }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const removeQueuePlayer = async (index: number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/queue/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode: 'TABLE1', index })
+      });
+      if (!res.ok) alert('Erreur lors de la suppression.');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editQueuePlayer = async (index: number) => {
+    const currentName = tableState?.queue?.[index] || '';
+    const newName = prompt('Entrez le nouveau nom:', currentName);
+    if (!newName || newName === currentName) return;
+    try {
+      const res = await fetch(`${API_URL}/api/queue/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode: 'TABLE1', index, newName })
+      });
+      if (!res.ok) alert('Erreur lors de la modification.');
     } catch (e) {
       console.error(e);
     }
@@ -210,20 +242,43 @@ function Home() {
         </div>
       </div>
 
-      {/* Stats Section */}
+      {/* Queue Selection Section */}
       <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '100%', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#3498db' }}>👤 Ajouter le Joueur Suivant</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <input
-            className="player-input"
-            value={nextPlayerName}
-            onChange={e => setNextPlayerName(e.target.value)}
-            placeholder="Nom du prochain joueur"
-          />
-          <button className="btn-launch" style={{ padding: '0.75rem' }} onClick={addNextPlayerContext}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#3498db', textAlign: 'center' }}>👤 AJOUTER LE JOUEUR SUIVANT</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>NOM DU JOUEUR</label>
+            <input
+              style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 'var(--radius-sm)' }}
+              value={nextPlayerName}
+              onChange={e => setNextPlayerName(e.target.value)}
+              placeholder="Ex: Ahmed"
+            />
+          </div>
+          <button className="btn-launch" style={{ padding: '1rem', borderRadius: 'var(--radius-full)', fontWeight: 'bold' }} onClick={addNextPlayerContext}>
             ➕ Ajouter à la File
           </button>
         </div>
+
+        {tableState?.queue && (tableState.queue as string[]).length > 0 && (
+          <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: 'var(--color-text-muted)', textAlign: 'center', letterSpacing: '1px' }}>FILE D'ATTENTE ({(tableState.queue as string[]).length})</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {(tableState.queue as string[]).map((name: string, idx: number) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ color: 'var(--color-accent-green)', fontWeight: 'bold', fontSize: '1.1rem' }}>{idx + 1}.</span>
+                    <span style={{ fontWeight: '500' }}>{name}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button onClick={() => editQueuePlayer(idx)} style={{ background: 'rgba(52, 152, 219, 0.1)', border: 'none', color: '#3498db', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✏️</button>
+                    <button onClick={() => removeQueuePlayer(idx)} style={{ background: 'rgba(231, 76, 60, 0.1)', border: 'none', color: '#e74c3c', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '100%' }}>
@@ -252,7 +307,7 @@ function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {statEntries.map(([name, s]) => (
+                    {(statEntries as [string, PlayerStat][]).map(([name, s]) => (
                       <tr key={name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>{name}</td>
                         <td style={{ textAlign: 'center', padding: '0.75rem 0.5rem', color: '#2ecc71', fontWeight: 'bold' }}>{s.wins}</td>

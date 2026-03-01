@@ -5,7 +5,7 @@ import './TvView.css';
 
 export default function TvView() {
     const { roomCode } = useParams<{ roomCode: string }>();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { gameState, connected, sendAction } = useSocket(roomCode || '');
 
     // Send configuration if we just joined from home with params
@@ -16,9 +16,9 @@ export default function TvView() {
                 matchType: searchParams.get('type') || 'FRAME_UNIQUE'
             });
             // Clear params from URL so we don't keep sending them on refresh
-            window.history.replaceState({}, document.title, window.location.pathname);
+            setSearchParams({}, { replace: true });
         }
-    }, [connected, searchParams, sendAction]);
+    }, [connected, searchParams, sendAction, setSearchParams]);
 
     // Timer state decoupled from gameState re-renders
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -44,117 +44,119 @@ export default function TvView() {
     const seconds = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
 
     return (
-        <div className="tv-app">
-            <div className="tv-layout">
+        <div className="tv-app" style={{ overflow: 'hidden' }}>
+            <div className="tv-layout" style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                padding: '2vw'
+            }}>
 
                 {/* Main Score Board */}
-                <div className="scoreboard-container flex-center">
-                    <div className={`player-card ${gameState.activePlayer === 0 ? 'active' : ''}`}>
-                        <div className="player-name">{gameState.players[0]}</div>
-                        <div className="player-score">{gameState.scores[0]}</div>
+                <div className="scoreboard-container flex-center" style={{
+                    flexWrap: 'nowrap',
+                    width: '100%',
+                    maxWidth: '1800px',
+                    gap: '4vw',
+                    margin: '0 auto'
+                }}>
+                    <div className={`player-card ${gameState.activePlayer === 0 ? 'active' : ''}`} style={{
+                        flex: 1,
+                        minWidth: '0',
+                        padding: '2vw',
+                        borderRadius: '20px'
+                    }}>
+                        <div className="player-name" style={{ fontSize: '3.5vw', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gameState.players[0]}</div>
+                        <div className="player-score" style={{ fontSize: '12vw', lineHeight: '1' }}>{gameState.scores[0]}</div>
                         {gameState.matchType && gameState.matchType !== 'FRAME_UNIQUE' && gameState.framesWon && (
-                            <div className="frames-won">
+                            <div className="frames-won" style={{ fontSize: '2vw' }}>
                                 Frames: {gameState.framesWon[0]}
                             </div>
                         )}
-                        <div className="player-best-break">Highest: {gameState.bestBreaks[0]}</div>
+                        <div className="player-best-break" style={{ fontSize: '1.5vw' }}>Highest: {gameState.bestBreaks[0]}</div>
                     </div>
 
-                    <div className="vs-divider flex-col">
-                        <div className="vs-circle">VS</div>
+                    <div className="vs-divider flex-col" style={{ gap: '1vh' }}>
+                        <div className="vs-circle" style={{ width: '6vw', height: '6vw', fontSize: '2vw' }}>VS</div>
                         {gameState.matchType && gameState.matchType !== 'FRAME_UNIQUE' && (
-                            <div className="match-type-badge">BO{gameState.matchType}</div>
+                            <div className="match-type-badge" style={{ fontSize: '1.2vw' }}>BO{gameState.matchType}</div>
                         )}
                     </div>
 
-                    <div className={`player-card ${gameState.activePlayer === 1 ? 'active' : ''}`}>
-                        <div className="player-name">{gameState.players[1]}</div>
-                        <div className="player-score">{gameState.scores[1]}</div>
+                    <div className={`player-card ${gameState.activePlayer === 1 ? 'active' : ''}`} style={{
+                        flex: 1,
+                        minWidth: '0',
+                        padding: '2vw',
+                        borderRadius: '20px'
+                    }}>
+                        <div className="player-name" style={{ fontSize: '3.5vw', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gameState.players[1]}</div>
+                        <div className="player-score" style={{ fontSize: '12vw', lineHeight: '1' }}>{gameState.scores[1]}</div>
                         {gameState.matchType && gameState.matchType !== 'FRAME_UNIQUE' && gameState.framesWon && (
-                            <div className="frames-won">
+                            <div className="frames-won" style={{ fontSize: '2vw' }}>
                                 Frames: {gameState.framesWon[1]}
                             </div>
                         )}
-                        <div className="player-best-break">Highest: {gameState.bestBreaks[1]}</div>
+                        <div className="player-best-break" style={{ fontSize: '1.5vw' }}>Highest: {gameState.bestBreaks[1]}</div>
                     </div>
                 </div>
 
             </div>
 
-            {/* Enhanced Independent Timer Overlay */}
+            {/* Enhanced Independent Timer Overlay - Responsive positioning */}
             {gameState.matchStartTime && !gameState.isWaitingForMatch && (
-                <div className="timer-overlay" style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', color: '#f1c40f', padding: '1rem 2.5rem', borderRadius: '12px', fontFamily: 'monospace', fontSize: '3rem', fontWeight: 'bold', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 10 }}>
+                <div className="timer-overlay" style={{ position: 'absolute', top: '2vw', right: '2vw', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', color: '#f1c40f', padding: '0.5vw 1.5vw', borderRadius: '12px', fontFamily: 'monospace', fontSize: '3.5vw', fontWeight: 'bold', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 10 }}>
                     {minutes}:{seconds}
                 </div>
             )}
 
             {/* Display Player Queue seamlessly */}
             {gameState.queue && gameState.queue.length > 0 && (
-                <div style={{ position: 'absolute', bottom: '100px', right: '2rem', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', padding: '1.5rem', borderRadius: '12px', zIndex: 5, textAlign: 'left' }}>
-                    <h3 style={{ margin: '0 0 1rem 0', color: '#2ecc71', fontSize: '1.5rem', textTransform: 'uppercase', letterSpacing: '2px' }}>A Venir (File d'attente)</h3>
+                <div style={{ position: 'absolute', bottom: '12vh', right: '2vw', background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(255,255,255,0.1)', padding: '1vw 1.5vw', borderRadius: '12px', zIndex: 5, textAlign: 'left', maxWidth: '20vw' }}>
+                    <h3 style={{ margin: '0 0 0.5vw 0', color: '#2ecc71', fontSize: '1.2vw', textTransform: 'uppercase', letterSpacing: '2px' }}>SUIVANTS</h3>
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                        {gameState.queue.map((player: string, index: number) => (
-                            <li key={index} style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ background: '#e74c3c', color: 'white', fontWeight: 'bold', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>
+                        {gameState.queue.slice(0, 3).map((player: string, index: number) => (
+                            <li key={index} style={{ color: 'white', fontSize: '1.2vw', marginBottom: '0.4vw', display: 'flex', alignItems: 'center', gap: '0.8vw' }}>
+                                <span style={{ background: '#e74c3c', color: 'white', fontWeight: 'bold', width: '1.8vw', height: '1.8vw', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '0.9vw' }}>
                                     {index + 1}
                                 </span>
-                                {player}
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player}</span>
                             </li>
                         ))}
                     </ul>
                 </div>
             )}
-            {/* Current Break Overlay perfectly centered over everything */}
+
+            {/* Current Break Overlay perfectly centered */}
             {gameState.currentBreak > 0 && !gameState.lastFrameWinner && (
                 <div className={`break-overlay ${isCentury ? 'century-glow' : isHalfCentury ? 'half-century-glow' : ''}`}>
-                    <div className="break-label">Break</div>
-                    <div className="break-value">{gameState.currentBreak}</div>
-                    {isCentury && <div className="break-badge">CENTURY BREAK 🔥</div>}
-                    {isHalfCentury && <div className="break-badge">HALF CENTURY ⭐</div>}
+                    <div className="break-label" style={{ fontSize: '2vw' }}>Break</div>
+                    <div className="break-value" style={{ fontSize: '8vw' }}>{gameState.currentBreak}</div>
                 </div>
             )}
 
-            {/* Frame Winner Overlay */}
-            {gameState.lastFrameWinner && !gameState.isWaitingForMatch && (
-                <div className="break-overlay century-glow">
-                    <div className="break-label" style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+            {/* Frame Winner Overlay - Persists until manual reset/new match */}
+            {gameState.lastFrameWinner && (
+                <div className="break-overlay century-glow" style={{ zIndex: 100, background: 'rgba(0,0,0,0.9)' }}>
+                    <div className="break-label" style={{ fontSize: '3vw', marginBottom: '1vh' }}>
                         {gameState.lastFrameWinner === 'Draw' ? 'Match Nul' : 'Victoire'}
                     </div>
-                    <div className="break-value" style={{ fontSize: '4rem' }}>
+                    <div className="break-value" style={{ fontSize: '10vw', textShadow: '0 0 30px rgba(255,255,255,0.8)' }}>
                         {gameState.lastFrameWinner !== 'Draw' ? gameState.lastFrameWinner : ''}
                     </div>
-                    <div className="break-badge">FRAME TERMINÉE 🎉</div>
+                    <div className="break-badge" style={{ fontSize: '1.5vw' }}>MATCH TERMINÉ 🎉</div>
                 </div>
             )}
 
-            {/* Waiting for Next Match Overlay */}
-            {gameState.isWaitingForMatch && (
-                <div className="waiting-overlay">
-                    <div className="waiting-content">
-                        <div className="waiting-balls">
-                            <span className="waiting-ball" style={{ background: '#e74c3c' }}></span>
-                            <span className="waiting-ball" style={{ background: '#f1c40f' }}></span>
-                            <span className="waiting-ball" style={{ background: '#2ecc71' }}></span>
-                            <span className="waiting-ball" style={{ background: '#b35d1e' }}></span>
-                            <span className="waiting-ball" style={{ background: '#3498db' }}></span>
-                            <span className="waiting-ball" style={{ background: '#e84393' }}></span>
-                            <span className="waiting-ball" style={{ background: '#222f3e' }}></span>
-                        </div>
-                        <div className="waiting-title">En attente du prochain match...</div>
-                        <div className="waiting-subtitle">Configurez les joueurs sur la télécommande</div>
-                    </div>
-                </div>
-            )}
-
-            {/* Match Info Footer properly docked */}
-            <div className="tv-footer-container">
+            {/* Phase info footer - Responsive height */}
+            <div className="tv-footer-container" style={{ height: '8vh' }}>
                 <div className="footer-stat">
-                    <span className="stat-label">Phase</span>
-                    <span className="stat-value">{gameState.phase}</span>
+                    <span className="stat-label" style={{ fontSize: '1vw' }}>Phase</span>
+                    <span className="stat-value" style={{ fontSize: '1.5vw' }}>{gameState.phase}</span>
                 </div>
                 <div className="footer-stat">
-                    <span className="stat-label">Reds Remaining</span>
-                    <span className="stat-value text-red">{gameState.remainingReds}</span>
+                    <span className="stat-label" style={{ fontSize: '1vw' }}>Reds</span>
+                    <span className="stat-value text-red" style={{ fontSize: '1.5vw' }}>{gameState.remainingReds}</span>
                 </div>
             </div>
         </div>
