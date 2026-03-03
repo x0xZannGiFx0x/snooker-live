@@ -1,0 +1,39 @@
+{
+  "TABLE1": {
+    "gameState": {
+      "players": [
+        "Player 1",
+        "Player 2"
+      ],
+      "matchType": "FRAME_UNIQUE",
+      "framesWon": [
+        0,
+        0
+      ],
+      "scores": [
+        0,
+        0
+      ],
+      "activePlayer": 0,
+      "remainingReds": 15,
+      "phase": "REDS",
+      "isColorTurn": false,
+      "currentColorIndex": 0,
+      "currentBreak": 0,
+      "isFreeballAvailable": false,
+      "bestBreaks": [
+        0,
+        0
+      ],
+      "pottedBalls": [
+        [],
+        []
+      ],
+      "lastFrameWinner": null,
+      "isWaitingForMatch": true,
+      "matchStartTime": null,
+      "history": [],
+      "queue": []
+    }
+  }
+}
